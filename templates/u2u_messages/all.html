@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% load extra_tags %}
+{% load humanize %}
+
+{% block title %}{% spaceless %}Мои сообщения{% endspaceless %}{% endblock %}
+
+{% block forestyle %}
+<style type="text/css">
+#message_list {}
+#message_list .message {margin:10px 0;padding:10px;}
+#message_list .send {border:yellow solid 3px;}
+#message_list .inbox {border:green solid 3px;}
+</style>
+{% endblock %}
+
+{% block content %}
+    <div id="message_list">
+    {% for message in messages.object_list %}
+        <div class="message {% ifequal message.user_from request.user %}send{% else %}inbox{% endifequal %}">
+            <div class="user context-menu">
+                <ul class="context-menu-trigger">
+                    <li class="thumb">{% gravatar message.user_from 32 %}</li>
+                    <li>{{ message.user_from.decorated_name }}</li>
+                    <li>{% diff_date message.send_date %}</li>
+                </ul>
+                <ul class="context-menu-dropdown">
+                    <li class="item"><a rel="nofollow" href="{% url u2u_messages.views.user message.user_from.username %}" title="Посмотреть переписку">Посмотреть переписку</a></li>
+                    <li class="item"><a rel="nofollow" href="{{ message.user_from.get_profile_url }}" title="Профиль пользователя">Профиль пользователя</a></li>
+                </ul>
+            </div>
+            <p>{{ message.text }}</p>
+            {% ifnotequal message.user_from request.user %}
+            <div class="send_message">
+                <a onclick="open_message_form(this, {{ message.user_from.id }}); return false;" 
+                    href="{% url u2u_messages.views.user message.user_from %}">Ответить</a>
+            </div>
+            {% endifnotequal %}
+        </div>
+    {% endfor %}
+    </div>
+    <script type="text/javascript" charset="utf-8">
+        function open_message_form(link, user_id) {
+            var form = '<form>'
+            + '<p><textarea id="message_text"></textarea></p>'
+            + '<p><input id="message_send" onclick="send_message(this, '+user_id+');" type="button" value="Отправить" /></p>'
+            + '</form>';
+            var block = $(link).parents('.send_message');
+            $(block).append(form);
+            $(block).children('form').hide();
+            $(block).children('a').hide();
+            $(block).children('form').show("fast");
+        }
+        function send_message(link, user_id) {
+            data = {"user_id": user_id, "text": $('#message_text').val()}
+            $.post('/messages/send_message', data, function(data) {
+                if (data.status) {
+                    text = 'Сообщение отправленно';
+                } else {
+                    text = 'Произошла ошибка при отправлении';
+                }
+                var block = $(link).parents('.send_message');
+                $(block).append('<div class="message_error"></div>')
+                $(block).children('.message_error').text(text);
+                $(block).children('form').hide("fast");
+            });
+        }
+    </script>
+{% endblock %}
+
+{% block tail %}
+    {% load i18n %}
+    {% spaceless %}
+    <div class="pager">
+    <p class="paginator">
+        {% if messages.has_previous %}
+            <span class="prev">
+                <a href="{{ messages.previous_page_number }}" title="{% trans "previous" %}">&laquo; {% trans "previous" %}</a>
+            </span>
+        {% endif %}
+        {% for num in messages.paginator.page_range %}
+            {% ifequal num messages.number %}
+                <span class="curr this_page">{{ num }}</span>
+            {% else %}
+                <a class="page" href="?page={{ num }}" >{{ num }}</a>
+            {% endifequal %}
+        {% endfor %}
+        {% if messages.has_next %}
+            <span class="next"><a href="?page={{ messages.next_page_number }}" title="{% trans "next page" %}">{% trans "next page" %} &raquo;</a></span>    
+        {% endif %}
+    </p>
+    </div>
+    {% endspaceless %}
+{% endblock %}
